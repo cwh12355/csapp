@@ -1,0 +1,235 @@
+# sum_list.ys by name1e5s
+# Execution begins at address 0
+
+        .pos 0
+        irmovq stack,%rsp
+        call main
+        halt
+
+# Sample linked list
+        .align 8
+        ele1:
+        .quad 0x00a
+        .quad ele2
+        ele2:
+        .quad 0x0b0
+        .quad ele3
+        ele3:
+        .quad 0xc00
+        .quad 0
+
+main:	irmovq ele1,%rdi
+        call sum_list
+	    ret
+
+sum_list:
+	    irmovq $0,%rax
+	    jmp test
+loop:	mrmovq 0(%rdi),%rsi
+        addq %rsi,%rax
+        mrmovq 8(%rdi),%rsi
+        rrmovq %rsi,%rdi
+test:   andq %rdi,%rdi
+        jne loop
+        ret
+
+        .pos 0x100
+stack：
+进行测试：
+$ ./yas sum.ys
+$ ./yis sum.yo
+Stopped in 29 steps at PC = 0x13.  Status 'HLT', CC Z=1 S=0 O=0
+Changes to registers:
+%rax:	0x0000000000000000	0x0000000000000cba
+%rsp:	0x0000000000000000	0x0000000000000100
+
+Changes to memory:
+0x00f0:	0x0000000000000000	0x000000000000005b
+0x00f8:	0x0000000000000000	0x0000000000000013
+另外两个函数的：
+# rsum.ys by name1e5s
+# Execution begins at address 0
+
+	.pos 0
+	irmovq stack, %rsp
+	call main
+	halt
+
+# Sample linked list
+	    .align 8
+	    ele1:
+	    .quad 0x00a
+	    .quad e1e2
+	    e1e2:
+	    .quad 0x0b0
+	    .quad e1e3
+	    e1e3:
+	    .quad 0xc00
+	    .quad 0
+
+main:	irmovq ele1, %rdi
+	    call rsum_list
+	    ret
+
+
+rsum_list:
+	    pushq %r12
+	    irmovq $0, %rax
+	    andq %rdi,%rdi
+	    je re
+	    mrmovq 0(%rdi), %r12
+	    mrmovq 8(%rdi), %rdi
+	    call rsum_list
+	    addq %r12, %rax
+re:	    popq %r12
+	    ret
+
+	    .pos 0x100
+stack:
+
+# cblock.ys by name1e5s
+# Execution begins at address 0
+
+	.pos 0
+	irmovq stack, %rsp
+	call main
+	halt
+
+	.align 8
+# Source block
+src:
+	.quad 0x00a
+	.quad 0x0b0
+	.quad 0xc00
+
+# Destination block
+dest:
+	.quad 0x111
+	.quad 0x222
+	.quad 0x333
+
+main:
+	irmovq src, %rdi
+	irmovq dest, %rsi
+	irmovq $3, %rdx
+	call copy_block
+	ret
+
+copy_block:
+	pushq %r12
+	pushq %r13
+	pushq %r14
+	irmovq $1, %r13
+	irmovq $8, %r14
+	irmovq $0, %rax 
+	jmp Tloop
+loop:
+	mrmovq 0(%rdi), %r12 
+	addq %r14, %rdi
+	rmmovq %r12, (%rsi)
+	addq %r14, %rsi
+	xorq %r12, %rax
+	subq %r13, %rdx
+Tloop:
+	andq %rdx, %rdx
+	jg loop
+	popq %r14
+	popq %r13
+	popq %r12
+	ret
+
+	.pos 0x100
+sta iaddq 的属性在 sim/seq/seq-full.hcl 中特定的位置添加 "IIADDQ" ck:
+执行如下指令：
+
+$ make VERSION=full
+$ (cd ../ptest; make SIM=../seq/ssim TFLAGS=-i)
+ 优化函数：
+ $ ./correctness.pl #结果是否正确
+$ ./benchmark.pl #得出效率，分数越高结果越好
+#/* $begin ncopy-ys */
+##################################################################
+# ncopy.ys - Copy a src block of len words to dst.
+# Return the number of positive words (>0) contained in src.
+#
+# Include your name and ID here.
+#
+# Describe how and why you modified the baseline code.
+#
+##################################################################
+# Do not modify this portion
+# Function prologue.
+# %rdi = src , %rsi = dst, %rdx = len
+ncopy:
+
+##################################################################
+# You can modify this portion
+	# Loop header
+	xorq %rax,%rax		# count = 0
+	iaddq $-4,%rdx		# length -= 4
+	jl REM
+
+Loop:
+    mrmovq (%rdi), %r10	# read val from src...
+	mrmovq 8(%rdi),%r11
+	rmmovq %r10, (%rsi)	# ...and store it to dst
+	andq %r10, %r10		# val <= 0?
+	jle Npos		# if so, goto Npos:
+	iaddq $1,%rax
+Npos:
+	rmmovq %r11,8(%rsi)
+	andq %r11,%r11
+	jle Npos2
+	iaddq $1,%rax
+Npos2:
+	mrmovq 16(%rdi),%r10
+	mrmovq 24(%rdi),%r11
+	rmmovq %r10, 16(%rsi)
+	andq %r10,%r10
+	jle Npos3
+	iaddq $1,%rax
+Npos3:
+	rmmovq %r11,24(%rsi)
+	andq %r11,%r11
+	jle nLoop
+	iaddq $1,%rax
+nLoop:
+	iaddq $32,%rdi
+	iaddq $32,%rsi
+	iaddq $-4,%rdx
+	jge Loop
+
+REM:
+	iaddq $3,%rdx
+	jl Done
+    mrmovq (%rdi), %r10
+	mrmovq 8(%rdi),%r11
+	rmmovq %r10, (%rsi)
+	andq %r10,%r10
+	jle RENPO
+	iaddq $1,%rax
+RENPO:
+	iaddq $-1,%rdx
+	jl Done
+	rmmovq %r11,8(%rsi)
+	andq %r11,%r11
+	jle RENPO1
+	iaddq $1,%rax
+RENPO1:
+	iaddq $-1,%rdx
+	jl Done
+    mrmovq 16(%rdi), %r10
+	rmmovq %r10, 16(%rsi)
+	andq %r10,%r10
+	jle Done
+	iaddq $1,%rax
+##################################################################
+# Do not modify the following section of code
+# Function epilogue.
+Done:
+	ret
+##################################################################
+# Keep the following label at the end of your function
+End:
+#/* $end ncopy-ys */
+
