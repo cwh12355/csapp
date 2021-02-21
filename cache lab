@@ -1,0 +1,162 @@
+struct cache
+├── struct cacheSet
+    ├── struct setLine
+        ├── int valid
+        ├── int tag
+        ├── char* block
+        └── (help) int timeStamp
+
+
+typedef struct{
+	// Three fundamental parameters in perline 
+	int valid;
+	unsigned long long tag;
+	char *block;
+	// choose which to evict in LRU
+	int timeStamp;
+} setLine;
+
+//set struct
+typedef struct{
+	setLine *lines;
+} cacheSet;
+
+//cache struct
+typedef struct{
+	cacheSet *sets;
+} cache;
+
+ypedef struct{
+	int s;//Number of set index bits (S = 2^s is the number of sets)
+    int S;//S=2^s
+    int b;//Number of block bits (B = 2^b is the block size)
+    int B;//B=2^b
+    int E;//Associativity (number of lines per set)
+    int verbosity;//Optional verbose flag that displays trace info
+    
+    //LRU output
+    int hitNum;
+    int missNum;
+    int evictionNum;
+} cachePara;
+
+
+int main(int argc, char** argv){
+	//init cache structure
+	cache LRUcache;
+    cachePara parameters;
+    parameters.verbosity=0;
+
+    //use getopt.h to read data from terminal, store them in parameters(1)
+    char input;
+    char *trace;
+    while( (input=getopt(argc,argv,"s:E:b:t:vh")) != -1){
+        switch(input){
+        case 's':
+            parameters.s = atoi(optarg);
+            break;
+        case 'E':
+            parameters.E = atoi(optarg);
+            break;
+        case 'b':
+           parameters.b = atoi(optarg);
+            break;
+        case 't':
+            trace = optarg;
+            break;
+        case 'v':
+            parameters.verbosity = 1;
+            break;
+        // print parameter prototype
+        case 'h':
+            printUsage();
+            exit(0);
+        default:
+            printUsage();
+            exit(-1);
+        }
+    }
+
+    //init parameters(2)
+    parameters.S = pow(2.0,parameters.s);
+    parameters.B = pow(2.0,parameters.b);
+    parameters.missNum = 0;
+    parameters.hitNum = 0;
+    parameters.evictionNum = 0;
+
+    //cache init
+    LRUcache = initCache(parameters);
+
+    //imput trace file while simulation
+    char command;
+    int size;
+    unsigned long long address;
+    FILE *file;
+    file=fopen(trace,"r");
+    while(fscanf(file," %c %llx,%d",&command,&address,&size)==3){
+    	switch(command){
+    		case 'I':
+                break;
+    		case 'L': //Load
+                parameters = simulate(LRUcache, parameters, address);
+                break;
+            case 'S': //Store
+                parameters = simulate(LRUcache, parameters, address);
+                break;
+            case 'M': //Modify
+                parameters = simulate(LRUcache, parameters, address);
+                parameters = simulate(LRUcache, parameters, address);	
+                break;
+            default: //ignore 'I'
+                break;
+    	}
+    }
+    printSummary(parameters.hitNum,parameters.missNum,parameters.evictionNum);
+    fclose(file);
+
+    return 0;
+}
+
+
+cachePara simulate(cache currentCache, cachePara parameters, unsigned long long address){
+    //get the tag
+	int tagSize = 64-(parameters.b + parameters.s); //64 bit system
+    unsigned long long tag = address >> (parameters.s + parameters.b);
+    //get the set index
+    unsigned long long tmp = address << (tagSize);
+    unsigned long long setIndex = tmp >> (tagSize + parameters.b);
+    cacheSet set = currentCache.sets[setIndex];
+    
+    int flag=1;//1 to hit, 0 not;
+
+    //simulation hit
+    for(int i=0;i<parameters.E;i++){
+    	setLine currentLine=set.lines[i];
+    	if(checkHit(currentLine,tag)==1){
+    		parameters.hitNum++;
+            flag=0;
+            int tail=checkTail(set, parameters);
+            set.lines[i].timeStamp = set.lines[tail].timeStamp+1;
+    	}
+    }
+
+    //simulation miss load
+    if(flag && checkFull(set,parameters)){
+    	parameters.missNum++;
+    	int loadIndex= checkLoad(set,parameters);
+    	set.lines[loadIndex].valid=1;
+    	set.lines[loadIndex].tag=tag;
+    	int tail=checkTail(set,parameters);
+    	set.lines[loadIndex].timeStamp=set.lines[tail].timeStamp+1;
+    }
+    else if(flag){
+        parameters.missNum++;
+        parameters.evictionNum++;
+        int evictIndex= checkEvict(set,parameters);
+        set.lines[evictIndex].valid=1;
+        set.lines[evictIndex].tag=tag;
+        int tail= checkTail(set,parameters);
+    	set.lines[evictIndex].timeStamp=set.lines[tail].timeStamp+1;
+    }
+    return parameters;
+}
